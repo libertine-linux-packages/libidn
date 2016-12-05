@@ -1,0 +1,92 @@
+# This file is part of libertine linux's package libidn. It is subject to the license terms in the COPYRIGHT file found in the top-level directory of this distribution and at https://raw.githubusercontent.com/libertine-linux-packages/libidn/master/COPYRIGHT. No part of libertine linux's package libidn, including this file, may be copied, modified, propagated, or distributed except according to the terms contained in the COPYRIGHT file.
+# Copyright © 2016 The developers of libertine linux's package libidn. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/libertine-linux-packages/libidn/master/COPYRIGHT.
+
+
+variant=upstream
+
+depends build_musl_cross_make_host
+build_needs "$libertine_host"-cc "$libertine_host"-gcc "$libertine_host"-ar "$libertine_host"-ld "$libertine_host"-ranlib "$libertine_host"-strip
+
+depends build_ccache
+build_needs ccache
+
+depends build_gnumake
+build_needs make
+
+depends build_perl
+build_needs perl
+
+depends build_gnuconfig
+
+depends build_autoconf
+build_needs autoconf autoheader autom4te autoreconf autoscan autoupdate ifnames
+
+depends build_automake
+build_needs automake aclocal
+
+depends build_busybox
+build_needs expr install sort ls sleep touch rmdir uniq
+# FFS! Why?
+build_needs date hostname
+build_needs rm sed
+
+depends build_slibtool
+build_needs clibtool-static libtoolize realpath
+
+depends build_gnum4
+build_needs m4
+
+build_needs cat rm sed tr
+libertine_compile_libidn()
+{
+	pushd "$(libertine_public_sourcePath)"
+		
+		libertine_public_autoconf_replaceWithKnownVersionOfConfigRpath build-aux/config.rpath
+		
+		libertine_public_ccache_createSymlinks
+		
+		rm GNUmakefile
+		
+		libertine_public_autoconf_adjustConfigureAcToRemoveGnuTextCruftBeforeAutoconf
+		
+		cat Makefile.am | tr '\n' '\r' | sed -e 's/\\\r//g' | tr '\r' '\n' | \
+		sed -i \
+			-e 's;SUBDIRS .*$;SUBDIRS = gl lib/gl lib src;g' \
+			Makefile.am
+		
+		sed -i \
+			-e 's/AM_INIT_AUTOMAKE.*/AM_INIT_AUTOMAKE/g' \
+			-e '/^  contrib/d' \
+			-e '/^  csharp/d' \
+			-e '/^  doc/d' \
+			-e '/^  examples/d' \
+			-e '/^  gltests/d' \
+			-e '/^  java/d' \
+			-e '/^  po/d' \
+			-e '/^  tests/d' \
+			configure.ac
+				
+		printf '' >ChangeLog
+		
+		libtoolize --install --force --verbose
+		autoreconf --install --force --verbose
+		
+		libertine_public_autoconf_modernAutoconfConfigure
+
+		libertine_public_addOrReplaceBinaryInPathWithSwallow gperf
+		libertine_public_addOrReplaceBinaryInPathWithSwallow gengetopt
+		printf '' >src/idn_cmd.c
+		printf '' >src/idn_cmd.h
+		cat >src/idn.c <<-EOF
+			int main (int argc, char *argv[])
+			{
+				return 0;
+			}
+		EOF
+		
+		libertine_public_make
+		
+		libertine_public_make DESTDIR="$(libertine_public_outputHostSysrootPath)" install
+		
+	popd
+}
