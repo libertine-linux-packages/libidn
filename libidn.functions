@@ -36,7 +36,7 @@ build_needs clibtool-static libtoolize realpath
 depends build_gnum4
 build_needs m4
 
-build_needs cat rm sed tr
+build_needs cat rm sed tr mkdir cp
 libertine_compile_libidn()
 {
 	pushd "$(libertine_public_sourcePath)"
@@ -85,6 +85,23 @@ libertine_compile_libidn()
 		EOF
 		
 		libertine_public_make
+		
+		# Fix Up libidn.a so it includes missing symbols
+		local ar="$libertine_host"-ar
+		local ranlib="$libertine_host"-ranlib
+		local temporaryFolder='slibtool-is-broken'
+		mkdir -m 0700 -p slibtool-is-broken
+		cp lib/.libs/libidn.a lib/gl/.libs/libgnu.a "$temporaryFolder"
+		pushd "$temporaryFolder"
+			"$ar" xo libgnu.a
+			rm libgnu.a
+			set +f
+				"$ar" q libidn.a *.o
+			set -f
+			"$ranlib" libidn.a
+		popd
+		rm lib/.libs/libidn.a
+		cp "$temporaryFolder"/libidn.a lib/.libs
 		
 		libertine_public_make DESTDIR="$(libertine_public_outputHostSysrootPath)" install
 		
